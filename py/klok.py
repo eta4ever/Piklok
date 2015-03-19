@@ -1,18 +1,17 @@
 """
-Имеется 4 индикатора ИН-12, управляемые дешифраторами К155ИД1.
-Каждому надо выдать четыре бита. Считаем 0 разрядом младший разряд
-минут, соотв., 3 - старший разряд часов
+Работа с модулем индикации на ИН-12 с последовательным интерфейсом
 """
+
 try:
 	import RPi.GPIO as GPIO 	# для GPIO
 	import time 				# для задержек
 	from datetime import datetime # для получения системного времени
 	import random # для случайного вывода в эффектах
 
-	# наборы GPIO, соответствующих разрядам 
-	nixie_digit_gpios = [[3,5,7,11],[13,13,13,13],[13,13,13,13],[13,13,13,13]]
+	nData = 3; #GPIO3 - линия данных
+	nCLK = 5; #GPIO5 - линия тактирования
 
-	def gpio_init(nixie_digit_gpios):
+	def gpioInit():
 		"""
 		Инициализируем GPIO
 		"""
@@ -21,40 +20,56 @@ try:
 		# Отключение предупреждений
 		GPIO.setwarnings(False)
 
-		# GPIO, соотв. разрядам индикации - выходы
-		for nixie_digit in range(0, len(nixie_digit_gpios)):
-			for bit in nixie_digit_gpios[nixie_digit]:
-				GPIO.setup(bit, GPIO.OUT)
-				GPIO.output(bit, 0)
+		# GPIO выходы
+		GPIO.setup(nData, GPIO.OUT)
+		GPIO.setup(nCLK, GPIO.OUT)
+		GPIO.output(nData, 0)
+		GPIO.output(nCLK, 0)
 
-	def print_digit (nixie_digit_gpios, digit, value):
+	def pushBits (halfByte):
 		"""
-		Записать в разряд digit списка разрядов цифру value
+		выдать 4 бита в последовательный интерфейс модуля индикации
 		"""
 		for bit in range(0,4):
-				# получаем один бит сдвигом и & 
-				# и записываем в GPIO
-				current_bit = (value >> bit) & 1
-				GPIO.output(nixie_digit_gpios[digit][bit], current_bit)
+			# получить один бит сдвигом и &
+			# и записать в GPIO
+			current_bit = (halfByte >> bit) & 1
+			GPIO.output(nData, current_bit)
 
-	def effect_shuffle(nixie_digit_gpios, digits):
+		# такт загрузки
+		time.sleep(0.01)
+		GPIO.output(nCLK, 1)
+		time.sleep(0.01)
+		GPIO.output(nCLK, 0)
+		time.sleep(0.01)
+
+	def outputTime (hH, hL, mH, mL):
 		"""
-		Показываем в выбранных разрядах случайные цифры
+		вывести время. hH - старший полубайт часов, hL - младший,
+		аналогично для минут
 		"""
-		effect_time = 2 # длительность эффекта
-		effect_delay = 0.1 # время демонстрации цифры
-		time_elapsed = 0 # счетчик времени эффекта
 
-		iterations = int(effect_time / effect_delay)
+		# так уж схемотехнически странно получилось. На старших пинах регистров
+        # сидят старшие разряды. Поэтому порядок запихивания битов такой:
+    	# старший полубайт часов, младший часов, старший минут, младший минут.
+		
+    	pushBits(hH)
+    	pushBits(hL)
+    	pushBits(mH)
+    	pushBits(mL)
 
-		for dummy_counter in range(0, iterations):
-			for digit in digits:
-				print_digit(nixie_digit_gpios, digit, random.randrange(0,10))
-			time.sleep(effect_delay)
+	def effectShuffle(iterNo, iterDelay):
+		"""
+		Показываем случайные цифры
+		iterNo итераций, задерка итерации iterDelay
+		"""
+		for dummy_counter in range(0,iterNo):
+			outputTime(random.randrange(0,10), random.randrange(0,10), random.randrange(0,10), random.randrange(0,10))
+			time.sleep(iterDelay)
 
 	# основная программа
-	gpio_init(nixie_digit_gpios)
-	effect_displayed = False # флаг показанного эффекта
+	gpioInit()
+	effectDisplayed = False # флаг показанного эффекта
 
 	while (True):
 		
@@ -62,22 +77,21 @@ try:
 		now = datetime.now()
 		
 		# формирование разрядов
-		values = [now.minute % 10, now.minute // 10, now.hour % 10, now.hour // 10] 
+		digits = [now.minute % 10, now.minute // 10, now.hour % 10, now.hour // 10] 
 		
-		# каждые 10 минут - эффект shuffle в разрядах минут
-		# надо запустить только один раз! Поэтому ставим флаг, а на
-		# следующей минуте его сбрасываем
+		# каждые 10 минут - эффект случайных цифр
+		# надо запустить только один раз! Поэтому поставить флаг, а на
+		# следующей минуте его сбросить
 
 		if ( (values[0] == 0) and not(effect_displayed)):
-			effect_shuffle(nixie_digit_gpios, [0,1])
-			effect_displayed = True
+			effectShuffle(20, 0.1)
+			effectDisplayed = True
 
 		if (values[0] == 1):
-			effect_displayed = False
+			effectDisplayed = False
 
 		# вывод
-		for digit in range(0, 4):
-			print_digit(nixie_digit_gpios, digit, values[digit])
+		outputTime(digits[3], digits[2], digits[1], digits[0])
 		
 		# пауза
 		time.sleep(1)
