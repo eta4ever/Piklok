@@ -1,4 +1,14 @@
-Piklok - Nixie clock driven by Raspberry Pi
+PiKlok - Nixie clock driven by Raspberry Pi
 =========
+PiKlok - часы на газоразрядных индикаторах ИН-12 с чиптюновым будильником.
+В качестве мозгов - Raspberry Pi.
+Репозиторий чиптюнового модуля на AY-3-8912: https://github.com/eta4ever/ay-serial
 
-in the very beginning
+pcbs - разводка платы под 4 штуки ИН-12 и дешифраторы 155ИД1. Там же - разводка платы "второй этаж" - с двумя сдвиговыми регистрами, чтобы у модуля последовательный интерфейс был. Sprint Layout 6.
+
+sch - схемы двух плат в Eagle.
+
+py - питоний код для малинки.
+
+
+
