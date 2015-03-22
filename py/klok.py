@@ -7,9 +7,31 @@ try:
     import time                 # для задержек
     from datetime import datetime # для получения системного времени
     import random # для случайного вывода в эффектах
+    import subprocess # для вызова проигрывателя
 
     nData = 3; #GPIO3 - линия данных
     nCLK = 5; #GPIO5 - линия тактирования
+
+    configFile = "settings" # файл конфигурации
+
+    def readAlarms():
+    	"""
+    	Прочитать из файла конфигурации список будильников
+    	"""
+    	fileConn = open(configFile, 'r') # открыть конфиг, для чтения
+    	alarms = [] # список будильников
+
+    	for line in fileConn: # читать построчно файл
+    		if (line[0] != "#"): # пропустить комментарии
+    			if (line[:5] == "Alarm"): # Выбрать строки нач. с Alarm
+    				hH = int(line[6]) # разобрать по цифрам
+    				hL = int(line[7])
+    				mH = int(line[9])
+    				mL = int(line[10])
+    				alarms.append([mL, mH, hL, hH])
+
+    	fileConn.close()
+    	return alarms
 
     def gpioInit():
         """
@@ -68,11 +90,14 @@ try:
             time.sleep(iterDelay)
 
     # основная программа
+    alarmsList = readAlarms() # прочитать список будильников
     gpioInit()
     effectDisplayed = False # флаг показанного эффекта
     
     # хранить отображаемую минуту. Если не совпадает с реальной - обновить отображение
     dispMin = 0;
+
+    alarmed = False;
 
     while (True):
         
@@ -97,9 +122,17 @@ try:
         if (digits[0] != dispMin):
         	outputTime(digits[3], digits[2], digits[1], digits[0])
         	dispMin = digits[0]
+
+        	# здесь же сбросить флаг прозвучавшего будильника
+        	alarmed = False
         
         # пауза
         time.sleep(1)
+
+        # будильник
+        if ( (digits in alarmsList) and not alarmed):
+        	subprocess.Popen(["python3", "ayPlayer.py", "1.ym"])
+        	alarmed = True
 
 finally: 
     # освободить GPIO по завершению программы
